@@ -336,6 +336,7 @@ list_reverse (struct list *list)
     }
 }
 
+
 /* Returns true only if the list elements A through B (exclusive)
    are in order according to LESS given auxiliary data AUX. */
 static bool

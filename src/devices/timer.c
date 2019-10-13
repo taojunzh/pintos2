@@ -89,11 +89,15 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
-
+ // int64_t start = timer_ticks ();
+  if (ticks<=0) return;
+  struct thread *current=thread_current();
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  current->count=ticks;
+  struct semaphore sema1;
+  sema_init(&sema1,0);
+  current->sema=&sema1;
+  sema_down(current->sema);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +176,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  //struct thread *current=thread_current();
+  thread_foreach(check_count, NULL);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

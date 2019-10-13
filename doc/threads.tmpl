@@ -8,9 +8,9 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Tao Jun Zheng <taojunzh@buffalo.edu>
+Ying Yin Li <yingyinl@buffalo.edu>
+Edwin Chiu <echiu2@buffalo.edu>
 
 ---- PRELIMINARIES ----
 
@@ -29,27 +29,36 @@ FirstName LastName <email@domain.example>
 >> A1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+	int64_t count; //a global variable in thread class which keeps the count of thread's sleep ticks.
+	static void timer_interrupt (struct intr_frame *args UNUSED);//we added a call to thread_foreach to check the count for each thread
+	void check_count(struct thread *, void *);//a function passed into thread_foreach which is called by timer_interrupt, decreases blocked thread's count if greater than 0, otherwise unblock the thread.
 
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
+	When the sleep time is greater than 0, sets the current thread's count to the sleep time. Block the current thread. The timer interrupt handler would call thread_foreach to check the counts for each thread. Once the count for a thread is decreased to 0, we unblock it.
 
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+	Only a call to thread_foreach, it handles all the operations.
+	
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
+	Only the thread that is currently running will be blocked each call.
 
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
+	We disabled interrupts around the assignment so that the order of the assignments will not be messed by the compiler,and thread block can only be called with interrupts off.
 
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+	We can't use busy waiting so we need to figure out a way to go aroud it. We think it would be a great idea to use timer interrupt handler to keep the time count. We thought that we could solve the problem within time_sleep() function, but then it is easier to keep in track of the time with global variable count in thread class and timer_interrupt() function. We also tried using sema_down and sema_up, but sema_up only pops the first of the waiting list, so we decided to just use block and unblock.
 
 			 PRIORITY SCHEDULING
 			 ===================
@@ -59,32 +68,46 @@ FirstName LastName <email@domain.example>
 >> B1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+	list_less_func: to sort the list with highest priority on the top
+	thread_unblock: insert the thread and sort the wating list
+	thread_yield: insert the thread and sort the wating list
+	thread_init: insert the thread and sort the wating list
+	thread_set_priority: sets the current thread's priority to new_priority. If the current thread no longer has the highest priority, yields.
+	int thread_get_priority: returns the current thread's priority. In the presence of priority donation, returns the higher (donated) priority.
 
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
+Highest Priority A  -->  L2  -->B  -->  L1  -->  C  Lowest priority
+We use a directed list from highest priority to lowest priority to track priority donation. A waits for L2 which is held by B, and B is waiting for a lock held by C. A and B both donate their priority to boost C's priority.
+
 
 ---- ALGORITHMS ----
 
 >> B3: How do you ensure that the highest priority thread waiting for
 >> a lock, semaphore, or condition variable wakes up first?
+	When we put a thread into the waiting list, we use insertion sort so the thread with highest priority will be at the head. If first thread in the waiting list is waiting for a lock, semaphore, or condition, it donates its priority and yield.
 
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
+	When a thread with lower priority call lock_acquire(), it will first check the conditions of the lock, if the lock is not NULL, and lock is not held by current thread. Then sema_down() will be called, and set the lock_holder to the current thread, which is the lower priority thread. However, a higher priority thread comes in and ready to run, but it wants to aquire the lock from the lower priority thread for the resource, the higher priority thread will donate its priority to the lower priority so that it can be executed first and release the lock to the higher priority thread. Nested donation is handled by checking which thread holds the lock that the higher priority thread waits for, if that thread is also waiting for a lock from a lower priority thread, the higher priority thread will donate its priority to the lower priority thread. As the lower priority thread release the lock, the thread that the higher priority thread waiting will get the lock. Lastly, the higher priority thread will donate its priority to this thread and yield, and wait for it to release the lock.
 
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
+	When it is called, sema_up is also called, unblocks the highest priority thread waiting for the lock, and the higher-priority thread will acquire the lock. In the case of priority donation, the highest priority thread gets its priority back and executes.
 
 ---- SYNCHRONIZATION ----
 
 >> B6: Describe a potential race in thread_set_priority() and explain
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
+	We can use a lock to avoid since the threads have to wait for lock to be unlocked before they get access to the resources.
 
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+	This is the first design we came up with, and we think using insertion sort is the best way to solve the priority problem.
 
 			  ADVANCED SCHEDULER
 			  ==================
@@ -94,6 +117,13 @@ FirstName LastName <email@domain.example>
 >> C1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+	int thread_get_nice (void): gets the nice value
+	void thread_set_nice (int new_nice): sets the nice value
+	void thread_set_priority (int new_priority): sets the priority
+	int thread_get_priority (void): sets the priority
+	int thread_get_recent_cpu (void): gets the recent cpu
+	int thread_get_load_avg (void): gets the number of threads ready to run over
+the past minute
 
 ---- ALGORITHMS ----
 
@@ -105,30 +135,33 @@ FirstName LastName <email@domain.example>
 timer  recent_cpu    priority   thread
 ticks   A   B   C   A   B   C   to run
 -----  --  --  --  --  --  --   ------
- 0
- 4
- 8
-12
-16
-20
-24
-28
-32
-36
+ 0      0   0   0  63  61  59   A
+ 4	4   0	0  62  61  59   A
+ 8	8   0   0  61  61  59   A
+12     12   0   0  60  61  59   B
+16     12   4   0  60  60  59   B
+20     12   8   0  60  59  59   A
+24     16   8   0  59  59  59   A
+28     20   8   0  58  59  59   B
+32     20  12   0  58  58  59   C
+36     20  12   0  58  58  58   c
 
 >> C3: Did any ambiguities in the scheduler specification make values
 >> in the table uncertain?  If so, what rule did you use to resolve
 >> them?  Does this match the behavior of your scheduler?
+	Yes, if multiple threads have the same priority as the current thread, and it the the highest, we run the current thread. If the current thread doesn't have the highest priority anymore, run the first thread with highest priority. 
+	It doesn't specify when to run recent_cpu, so we run recent_cpu first before we calculate the priority. 
 
 >> C4: How is the way you divided the cost of scheduling between code
 >> inside and outside interrupt context likely to affect performance?
-
+	If there are more code inside interrupt context, the interrupt state will be lasting longer and causing less concurrency and lower performance. The update funtions of recent CPU and priority take place inside the interrupt context since we want one thread to process and update at a time and then the next one process. Minimizing intructions inside the interrupt context might be helpful to improve performance.
 ---- RATIONALE ----
 
 >> C5: Briefly critique your design, pointing out advantages and
 >> disadvantages in your design choices.  If you were to have extra
 >> time to work on this part of the project, how might you choose to
 >> refine or improve your design?
+	Our implementation of the advanced scheduler will be an array size of 0 to 63 to hold 64 ready queues(linked list) since 4.4BSD schedular has 64 priorities so each ready queue will represent different priority. Within the ready queue(thread with same priority), if there are more than one threads, round-robin algorithm will be used to make sure that all the threads will take turns. The advantage of our design is that the structure of the priority scheduler is very clear and easy to implement aging to the threads and the runtime to move around the thread will be constant time for the linked list structure. The disadvantage is larger space complexity since 64 ready queues are allocated for the scheduler.
 
 >> C6: The assignment explains arithmetic for fixed-point math in
 >> detail, but it leaves it open to you to implement it.  Why did you
@@ -136,6 +169,8 @@ ticks   A   B   C   A   B   C   to run
 >> abstraction layer for fixed-point math, that is, an abstract data
 >> type and/or a set of functions or macros to manipulate fixed-point
 >> numbers, why did you do so?  If not, why not?
+	We will be creating the "fixed-point.h" on our own and place the file in the threads directory, and we need it for the calculation of recent cpu, load average and priority. We will want to implement the macros to manipulate fixd-pint nubmers by creating mutiple funtions for each operations of addition, subtraction, etc. So that when we can just call the the functions with arguments when we are doing the calculations, and the funtions will take care the fix-point conversion for us. Instead of placing the conversion instructions on the each calculation of recent cpu, load average and priority, which make it convenience and readable.
+	
 
 			   SURVEY QUESTIONS
 			   ================

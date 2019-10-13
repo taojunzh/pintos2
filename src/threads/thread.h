@@ -100,6 +100,9 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    int64_t count;
+    struct semaphore *sema;
+    int max_p;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -118,6 +121,9 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+bool compare_priority (const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
@@ -129,6 +135,7 @@ void thread_yield (void);
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
+void check_count(struct thread *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
