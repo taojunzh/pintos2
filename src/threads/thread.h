@@ -103,6 +103,8 @@ struct thread
     int64_t count;
     struct semaphore *sema;
     int max_p;
+    struct list waiting_locks;
+    struct lock *wanted_lock;
   };
 
 /* If false (default), use round-robin scheduler.
