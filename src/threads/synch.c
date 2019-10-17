@@ -195,9 +195,33 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
+  struct thread *current= thread_current();
+/*  if(lock->holder != NULL && !thread_mlfqs){
 
-  sema_down (&lock->semaphore);
+    struct lock *temp = lock;
+    while(temp!=NULL && current->priority > temp->max_p){
+	temp->max_p = current->priority;
+	donate(temp->holder);
+	temp= temp->holder->wanted_lock;
+}
+    current->wanted_lock = lock;
+}
+
+  sema_down (&lock->semaphore);*/
+
+/*  if(!thread_mlfqs && lock->holder==NULL){
+	lock->max_p=current->priority;
+//	current->wanted_lock=lock;
+	list_insert_ordered(&lock->holder->owned_locks, &lock->thread_holder, (list_less_func *) &compare_locks, NULL); 
+} */
+
+// sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+}
+bool 
+compare_locks (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+	return list_entry(a, struct lock, thread_holder)->max_p > list_entry(b, struct lock, thread_holder)->max_p;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -232,6 +256,10 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   lock->holder = NULL;
+//	if(!thread_mlfqs){
+//	list_remove(&lock->thread_holder);
+//	update(thread_current());
+//}
   sema_up (&lock->semaphore);
 }
 

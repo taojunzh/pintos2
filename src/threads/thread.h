@@ -103,10 +103,11 @@ struct thread
     int64_t count;
     struct semaphore *sema;
     int max_p;
-    struct list waiting_locks;
+    struct list owned_locks;
     struct lock *wanted_lock;
+    int nice;
   };
-
+  
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -141,6 +142,8 @@ void check_count(struct thread *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void donate(struct thread *t);
+void update(struct thread *t);
 
 int thread_get_nice (void);
 void thread_set_nice (int);

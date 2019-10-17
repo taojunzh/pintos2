@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixed-point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -245,7 +246,7 @@ thread_unblock (struct thread *t)
 bool 
 compare_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
-	return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
+	return list_entry(a, struct thread, elem)->max_p > list_entry(b, struct thread, elem)->max_p;
 }
 
 
@@ -353,15 +354,38 @@ check_count(struct thread *thread, void *aux UNUSED)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  thread_current ()->max_p = new_priority;
+//  if(list_entry(list_begin(&ready_list), struct thread, elem)-> max_p>new_priority&&!thread_mlfqs)
   thread_yield();
+  if(thread_mlfqs) return;
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+  if(!thread_mlfqs)
+  return thread_current ()->max_p;
+  if(thread_mlfqs)
+  return PRI_MAX-(divn(thread_get_recent_cpu(),4))-(muln(currentnice,));
+  return;
+}
+void donate(struct thread *t){
+	update(t);
+	if(t->status==THREAD_READY)
+	list_sort(&ready_list,(list_less_func *) &compare_priority, NULL);
+
+}
+void update(struct thread *t){
+	int max_priority = t->priority;
+	int lock_p;
+	if(!list_empty(&t->owned_locks)){
+	lock_p=list_entry(list_front(&t->owned_locks), struct lock, thread_holder)->max_p;
+		if(lock_p>max_priority){
+					max_priority=lock_p;
+}
+}
+	t->max_p = max_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -480,11 +504,19 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
+  if(!thread_mlfqs)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-
+  if(!thread_mlfqs)
+   t->max_p=priority;
+ t->wanted_lock=NULL;
+ list_init(&t->owned_locks);
   old_level = intr_disable ();
-  list_insert_ordered (&all_list, &t->allelem,(list_less_func *) &compare_priority, NULL);
+
+  
+  //list_insert_ordered (&all_list, &t->allelem,(list_less_func *) &compare_priority, NULL);
+  list_push_back(&all_list,&t->allelem);
+
   intr_set_level (old_level);
 }
 
