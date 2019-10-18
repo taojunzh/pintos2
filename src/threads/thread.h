@@ -103,9 +103,11 @@ struct thread
     int64_t count;
     struct semaphore *sema;
     int max_p;
+    int nice;
+    int load_avg;
+    int recent_cpu;
     struct list owned_locks;
     struct lock *wanted_lock;
-    int nice;
   };
   
 /* If false (default), use round-robin scheduler.
@@ -149,5 +151,9 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+void increment_recent_cpu(void);
+void update_load_avg(void);
+void update_recent_cpu(void);
+void update_priority(thead_current(struct thread *t));
 
 #endif /* threads/thread.h */

@@ -367,7 +367,7 @@ thread_get_priority (void)
   if(!thread_mlfqs)
   return thread_current ()->max_p;
   if(thread_mlfqs)
-  return PRI_MAX-(divn(thread_get_recent_cpu(),4))-(muln(currentnice,));
+  return PRI_MAX-(divn(thread_get_recent_cpu(),4))-(muln(thread_current()->nice,2));
   return;
 }
 void donate(struct thread *t){
@@ -390,9 +390,13 @@ void update(struct thread *t){
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int new_nice) 
 {
   /* Not yet implemented. */
+  thread_current()->nice=new_nice;
+  thread_current()->max_p= thread_get_priority();
+  if(thread_current()->max_p<(list_entry(list_begin(&ready_list), struct thread, elem)->max_p))
+  thread_yield();
 }
 
 /* Returns the current thread's nice value. */
@@ -400,7 +404,7 @@ int
 thread_get_nice (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -408,15 +412,19 @@ int
 thread_get_load_avg (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return muln(load_avg,100);
 }
+void increment_recent_cpu(void);
+void update_load_avg(void);
+void update_recent_cpu(void);
+void update_priority(thead_current(struct thread *t));
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return muln(recent_cpu,100);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -511,7 +519,11 @@ init_thread (struct thread *t, const char *name, int priority)
    t->max_p=priority;
  t->wanted_lock=NULL;
  list_init(&t->owned_locks);
+  nice = int_to_fix(0);
+  load_avg = int_to_fix(0);
+  recent_cpu = int_to_fix(0);
   old_level = intr_disable ();
+
 
   
   //list_insert_ordered (&all_list, &t->allelem,(list_less_func *) &compare_priority, NULL);
