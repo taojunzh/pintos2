@@ -96,6 +96,7 @@ timer_sleep (int64_t ticks)
   current->count=ticks;
   struct semaphore sema1;
   sema_init(&sema1,0);
+  sema1.sleep=1;
   current->sema=&sema1;
   sema_down(current->sema);
 }
@@ -181,11 +182,11 @@ timer_interrupt (struct intr_frame *args UNUSED)
   if(thread_mlfqs){
   increment_recent_cpu();
   if(timer_ticks() % TIMER_FREQ == 0){
-	update_load_avg();
-	update_recent_cpu();
+//	update_load_avg();
+//	update_recent_cpu();
 }
   else if(ticks%4==0){
-	update_priority(thead_current());
+	update_priority(thread_current());
 }
 
 }
