@@ -391,8 +391,9 @@ thread_set_nice (int new_nice)
 {
   /* Not yet implemented. */
   thread_current()->nice=new_nice;
-  thread_current()->priority= thread_get_priority();
-  if(thread_current()->priority<(list_entry(list_begin(&ready_list), struct thread, elem)->priority))
+//  if(thread_current()->nice<-20) thread_current()->nice=-20;
+//  if(thread_current()->nice>20) thread_current()->nice=20;
+  update_priority(thread_current(),NULL);
   thread_yield();
 }
 
@@ -412,21 +413,37 @@ thread_get_load_avg (void)
   return fix_to_int(muln(load_avg,100));
 }
 void increment_recent_cpu(void){
+	if(thread_current()!=idle_thread)
 	thread_current()->recent_cpu=addn(thread_current()->recent_cpu,1);
 }
 void update_load_avg(void){
-	
+	int x=div(int_to_fix(59),int_to_fix(60));
+	int temp=mul(load_avg,x);
+	x=div(int_to_fix(1),int_to_fix(60));
+	int temp1=(int)list_size(&ready_list);
+	if(thread_current()!=idle_thread) temp1++;
+	temp1=muln(x,temp1);
+	load_avg=addn(temp,temp1);
 }
-void update_recent_cpu(struct thread *t){
+void update_recent_cpu(struct thread *t, void *aux UNUSED){
+	if(!idle_thread){
 	int temp=muln(load_avg,2);
 	int temp1=muln(load_avg,2);
 	temp1=addn(temp1,1);
 	temp=div(temp,temp1);
 	temp=mul(temp,t->recent_cpu);
 	t->recent_cpu=addn(temp,t->nice);
+	update_priority(t,NULL);
 }
-void update_priority(struct thread *t){
-	
+}
+void update_priority(struct thread *t, void *aux UNUSED){
+	if(!idle_thread){
+	int temp1=divn(t->recent_cpu,4);
+	int temp2=t->nice*2;
+	t->priority=PRI_MAX-fix_to_int(temp1)-temp2;
+	if(t->priority<PRI_MIN) t->priority=PRI_MIN;
+	if(t->priority>PRI_MAX) t->priority=PRI_MAX;
+}
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -522,7 +539,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-//  if(!thread_mlfqs)
+  if(!thread_mlfqs)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
    t->base_p=priority;
@@ -534,8 +551,8 @@ init_thread (struct thread *t, const char *name, int priority)
 
 
   
-  //list_insert_ordered (&all_list, &t->allelem,(list_less_func *) &compare_priority, NULL);
-  list_push_back(&all_list,&t->allelem);
+  list_insert_ordered (&all_list, &t->allelem,(list_less_func *) &compare_priority, NULL);
+  
 
   intr_set_level (old_level);
 }

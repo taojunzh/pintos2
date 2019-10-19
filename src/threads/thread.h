@@ -153,7 +153,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 void increment_recent_cpu(void);
 void update_load_avg(void);
-void update_recent_cpu(struct thread *t);
-void update_priority(struct thread *t);
+void update_recent_cpu(struct thread *, void*);
+void update_priority(struct thread *, void*);
 
 #endif /* threads/thread.h */
