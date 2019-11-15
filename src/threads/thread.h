@@ -104,7 +104,6 @@ struct thread
     struct semaphore *sema;
     int base_p;
     int nice;
-//    int load_avg;
     int recent_cpu;
     struct list locks;
     struct lock *wanted_lock;

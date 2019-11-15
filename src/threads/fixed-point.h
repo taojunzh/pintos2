@@ -5,6 +5,7 @@
 
 int int_to_fix(int n);
 int fix_to_int(int x);
+int fix_to_int1(int n);
 int add(int x,int y);
 int sub(int x,int y);
 int mul(int x,int y);
@@ -20,7 +21,15 @@ int int_to_fix(int n){
 }
 
 int fix_to_int(int x){
-  return x/f;
+  if(x>=0) 
+return (x+f/2)/f;
+  if(x<=0) 
+return (x-f/2)/f;
+return 1;
+}
+
+int fix_to_int1(int n){
+  return n/f;
 }
 
 int add(int x, int y){

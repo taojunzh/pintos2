@@ -95,7 +95,6 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  load_avg=int_to_fix(0);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -112,6 +111,7 @@ thread_start (void)
 {
   /* Create the idle thread. */
   struct semaphore idle_started;
+  load_avg=0;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
 
@@ -378,7 +378,7 @@ if (new_priority < old && list_empty (&thread_current()->locks))
 int
 thread_get_priority (void) 
 {
-  if(!thread_mlfqs)
+//  if(!thread_mlfqs)
   return thread_current ()->priority;
 //  if(thread_mlfqs)
 //  return PRI_MAX-(divn(thread_get_recent_cpu(),4))-(muln(thread_current()->nice,2));
@@ -413,34 +413,36 @@ thread_get_load_avg (void)
   return fix_to_int(muln(load_avg,100));
 }
 void increment_recent_cpu(void){
+	ASSERT(thread_mlfqs);
 	if(thread_current()!=idle_thread)
 	thread_current()->recent_cpu=addn(thread_current()->recent_cpu,1);
 }
 void update_load_avg(void){
+ASSERT(thread_mlfqs);
 	int x=div(int_to_fix(59),int_to_fix(60));
 	int temp=mul(load_avg,x);
-	x=div(int_to_fix(1),int_to_fix(60));
 	int temp1=(int)list_size(&ready_list);
-	if(thread_current()!=idle_thread) temp1++;
-	temp1=muln(x,temp1);
-	load_avg=addn(temp,temp1);
+	if(thread_current()!=idle_thread) {temp1+=1;}
+	int temp2=div(int_to_fix(temp1),int_to_fix(60));
+	load_avg=add(temp,temp2);
 }
 void update_recent_cpu(struct thread *t, void *aux UNUSED){
-	if(!idle_thread){
+ASSERT(thread_mlfqs);
+	if(t!=idle_thread){
 	int temp=muln(load_avg,2);
-	int temp1=muln(load_avg,2);
-	temp1=addn(temp1,1);
-	temp=div(temp,temp1);
-	temp=mul(temp,t->recent_cpu);
-	t->recent_cpu=addn(temp,t->nice);
-	update_priority(t,NULL);
+	int temp1=addn(temp,1);
+	int temp2=div(temp,temp1);
+	int temp3=mul(temp2,t->recent_cpu);
+	t->recent_cpu=addn(temp3,t->nice);
+	//update_priority(t,NULL);
 }
 }
 void update_priority(struct thread *t, void *aux UNUSED){
-	if(!idle_thread){
+ASSERT(thread_mlfqs);
+	if(t!=idle_thread){
 	int temp1=divn(t->recent_cpu,4);
-	int temp2=t->nice*2;
-	t->priority=PRI_MAX-fix_to_int(temp1)-temp2;
+	int temp2=sub(int_to_fix(PRI_MAX),temp1);
+	t->priority=fix_to_int1(subn(temp2,t->nice*2));
 	if(t->priority<PRI_MIN) t->priority=PRI_MIN;
 	if(t->priority>PRI_MAX) t->priority=PRI_MAX;
 }
@@ -546,7 +548,8 @@ init_thread (struct thread *t, const char *name, int priority)
  t->wanted_lock=NULL;
  list_init(&t->locks);
   t->nice = 0;
-  t->recent_cpu = int_to_fix(0);
+ // t->recent_cpu = int_to_fix(0);
+  t->recent_cpu=0;
   old_level = intr_disable ();
 
 
