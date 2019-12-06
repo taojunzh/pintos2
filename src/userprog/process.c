@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -30,6 +31,8 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+  char *sp;
+  char *save_ptr;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -37,11 +40,14 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-
+  sp = malloc((strlen(file_name)+1));
+  strlcpy (sp, file_name, strlen(file_name)+1);
+  sp = strtok_r (sp," ",&save_ptr);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (sp, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+  free(sp);
   return tid;
 }
 
@@ -63,9 +69,10 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
-
+  thread_current()->parent->success=success;
+  sema_up(&thread_current()->parent->child_sema);
+  if (!success)
+    thread_exit()
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -88,7 +95,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  while(true){
+	thread_yield();}
 }
 
 /* Free the current process's resources. */
@@ -431,16 +439,21 @@ setup_stack (void **esp)
 {
   uint8_t *kpage;
   bool success = false;
-
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  hex_dump((uintptr_t)*esp,*esp,sizeof(char)*8,true);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success){
         *esp = PHYS_BASE;
+}
       else
         palloc_free_page (kpage);
     }
+	char my_string[8] = "CSCI350\0";
+	*esp -= sizeof(char) * 8;
+	memcpy(*esp, my_string, sizeof(char) * 8);
+	hex_dump((uintptr_t)*esp,*esp,sizeof(char)*8,true);
   return success;
 }
 
