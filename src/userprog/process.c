@@ -75,7 +75,7 @@ start_process (void *file_name_)
   thread_current()->parent->success=success;
   sema_up(&thread_current()->parent->child_sema);
   if (!success)
-    thread_exit()
+    thread_exit();
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -98,7 +98,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  sema_down(&thread_current->child_sema);
+  sema_down(&thread_current()->child_sema);
 }
 
 /* Free the current process's resources. */
@@ -467,7 +467,7 @@ setup_stack (void **esp, const char *file_name)
         token = strtok_r (NULL, " ", &save_ptr)){
 		argc++;
 }
-	char ** argv = malloc(argc,sizeof(char**));
+	char ** argv = malloc(argc*sizeof(char**));
 	for (token = strtok_r (cp2, " ", &save_ptr); token != NULL;
         token = strtok_r (NULL, " ", &save_ptr)){
 		*esp -= strlen(token) + 1;
@@ -475,7 +475,7 @@ setup_stack (void **esp, const char *file_name)
                 argv[i]=*esp;
 		i+=1;
 }
-	int padding = *esp%4;
+	int padding = (int)*esp%4;
 	if(padding!=0){
 		*esp -= padding;
 		memset(*esp, 0, padding);
@@ -495,7 +495,7 @@ setup_stack (void **esp, const char *file_name)
 	memset(*esp,0,4);
 	free(cp1);
 	free(cp2);
-	free(arv);
+	free(argv);
   return success;
 }
 
