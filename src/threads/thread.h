@@ -107,6 +107,12 @@ struct thread
     int recent_cpu;
     struct list locks;
     struct lock *wanted_lock;
+    /* for project 2 */
+    struct semaphore *child_sema;
+    bool success;
+    struct thread parent;
+    struct list children;
+    struct list_elem child;
   };
   
 /* If false (default), use round-robin scheduler.
