@@ -110,6 +110,7 @@ struct thread
     /* for project 2 */
     struct semaphore *child_sema;
     bool success;
+    int ret;
     struct thread *parent;
     struct list children;
     struct list_elem child;

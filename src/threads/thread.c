@@ -550,9 +550,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = 0;
  // t->recent_cpu = int_to_fix(0);
   t->recent_cpu=0;
+/*project 2*/
   struct semaphore sema;
   sema_init (&sema, 0);
   t->child_sema=&sema;
+  t->parent=thread_current();
+
+
   old_level = intr_disable ();
 
 

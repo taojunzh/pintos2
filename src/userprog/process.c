@@ -15,6 +15,7 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
@@ -71,17 +72,19 @@ start_process (void *file_name_)
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
   thread_current()->parent->success=success;
   sema_up(&thread_current()->parent->child_sema);
-  if (!success)
+  if (!success){
     thread_exit();
+	palloc_free_page (file_name);
+}
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
      arguments on the stack in the form of a `struct intr_frame',
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
+  palloc_free_page (file_name);
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
@@ -107,7 +110,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
 
-  sema_up(cur->parent->child_sema);
+
 
   uint32_t *pd;
 
@@ -123,6 +126,9 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+
+	printf ("%s: exit(%d)\n",cur->name,cur->ret);
+
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
@@ -228,6 +234,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+	char *save_ptr;
+	char *f_cp = malloc(strlen(file_name)+1);
+	strlcpy (f_cp, file_name, strlen(file_name)+1);
+	char *copy = strtok_r (f_cp," ",&save_ptr);
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
@@ -235,10 +245,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (copy);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", file_name);
+      printf ("load: %s: open failed\n", copy);
       goto done; 
     }
 
@@ -251,7 +261,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
-      printf ("load: %s: error loading executable\n", file_name);
+      printf ("load: %s: error loading executable\n", copy);
       goto done; 
     }
 
@@ -317,7 +327,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp, file_name))
     goto done;
-
+  free(f_cp);
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
