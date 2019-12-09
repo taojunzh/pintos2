@@ -18,11 +18,12 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-
+struct lock file_lock;
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -30,6 +31,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+lock_init(&file_lock);
   char *fn_copy;
   tid_t tid;
   char *save_ptr;
@@ -47,8 +49,11 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (copy, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR){
     palloc_free_page (fn_copy); 
+	return tid;
+}
+
 
 //  free(sp);
 
@@ -72,11 +77,19 @@ start_process (void *file_name_)
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
+  if(thread_current()->parent!=NULL)
   thread_current()->parent->success=success;
-  sema_up(&thread_current()->parent->child_sema);
   if (!success){
-    thread_exit();
-	palloc_free_page (file_name);
+	
+    palloc_free_page (file_name);
+  thread_current()->tid=-1;
+  if(thread_current()->parent!=NULL)
+  sema_up(thread_current()->parent->child_sema);
+  exit(-1);
+}else{
+  palloc_free_page (file_name);
+  if(thread_current()->parent!=NULL)
+  sema_up(thread_current()->parent->child_sema);
 }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -84,7 +97,7 @@ start_process (void *file_name_)
      arguments on the stack in the form of a `struct intr_frame',
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
-  palloc_free_page (file_name);
+
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
@@ -101,7 +114,26 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  sema_down(&thread_current()->child_sema);
+/*	struct list *list = &thread_current()->children;
+	struct list_elem *elem;
+	struct child *child=NULL;
+	for (elem = list_begin (list); elem != list_end (list); elem = list_next (elem))
+  {
+ 	child = list_entry (elem, struct child, child_elem);
+	if(child->pid==child_tid){
+	if (!child->waited){
+        child->waited = true;
+        break;
+      }
+}
+}
+  if (child==NULL) return -1;
+  int ret = child->status;
+  list_remove(elem);
+  free(child);
+  return ret;*/
+  while(true){thread_yield();}
+return -1;
 }
 
 /* Free the current process's resources. */
@@ -109,9 +141,6 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
-
-
-
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
@@ -128,7 +157,8 @@ process_exit (void)
          that's been freed (and cleared). */
 
 	printf ("%s: exit(%d)\n",cur->name,cur->ret);
-
+	
+	
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
@@ -245,6 +275,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  lock_acquire(&file_lock);
   file = filesys_open (copy);
   if (file == NULL) 
     {
@@ -336,6 +367,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  lock_release(&file_lock);
   return success;
 }
 
@@ -460,13 +492,8 @@ setup_stack (void **esp, const char *file_name)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success){
-        *esp = PHYS_BASE;
-}
-      else
-        palloc_free_page (kpage);
-    }
-
-	char *cp1 = malloc(strlen(file_name)+1);
+        *esp = PHYS_BASE-12;
+/*	char *cp1 = malloc(strlen(file_name)+1);
 	strlcpy (cp1, file_name, strlen(file_name)+1);
 	char *cp2 = malloc(strlen(file_name)+1);
 	strlcpy (cp2, file_name, strlen(file_name)+1);
@@ -505,7 +532,13 @@ setup_stack (void **esp, const char *file_name)
 	memset(*esp,0,4);
 	free(cp1);
 	free(cp2);
-	free(argv);
+	free(argv);*/
+}
+      else
+        palloc_free_page (kpage);
+    }
+
+
   return success;
 }
 

@@ -295,6 +295,8 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+  if(thread_current()->parent!=NULL)
+  sema_up(&thread_current()->parent->child_sema);
   process_exit ();
 #endif
 
@@ -343,6 +345,20 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+struct thread*
+get_child(tid_t tid){
+	struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      if(tid==t->tid)return t;
+    }
+	return NULL;
+}
 void
 check_count(struct thread *thread, void *aux UNUSED)
 {
@@ -554,8 +570,13 @@ init_thread (struct thread *t, const char *name, int priority)
   struct semaphore sema;
   sema_init (&sema, 0);
   t->child_sema=&sema;
-  t->parent=thread_current();
-
+  struct semaphore sema1;
+  sema_init (&sema1, 0);
+  t->wait_sema=&sema1;
+  t->waited=false;
+  list_init(&t->children);
+ // t->parent=thread_current();
+  t->success=false;
 
   old_level = intr_disable ();
 

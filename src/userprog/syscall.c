@@ -11,8 +11,10 @@
 #include "filesys/file.h"
 #include "devices/input.h"
 #include "devices/shutdown.h"
+#include "threads/synch.h"
 
 typedef int pid_t;
+struct lock file_lock;
 
 static void syscall_handler (struct intr_frame *);
 void check_addr(const void *ptr);
@@ -31,9 +33,11 @@ unsigned tell (int fd);
 void close (int fd);
 
 
+
 void
 syscall_init (void) 
 {
+	lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -108,7 +112,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 void
 check_addr(const void *ptr){
-	if(!is_user_vaddr (ptr) || pagedir_get_page (thread_current()->pagedir, ptr)==NULL ){
+	if(ptr==NULL || !is_user_vaddr (ptr) || !pagedir_get_page (thread_current()->pagedir, ptr) ){
 		exit(-1);
 }			 																				
 }
@@ -123,17 +127,34 @@ exit(int status){
 }
 
 pid_t exec(const char *cmd_line){
+	pid_t pid=-1;
+	if(*cmd_line==NULL) return pid;
+	struct thread *cur=thread_current();
+	sema_down(&cur->child_sema);
+	pid=process_execute(cmd_line);
+	if(!cur->success){
 	return -1;
+}
+	return pid;
 }
 
+
 int wait(pid_t pid){
-	return -1;
+	return process_wait(pid);
 }
 bool create (const char *file, unsigned initial_size){
-	return false;
+	bool ret;
+	lock_acquire(&file_lock);
+	ret=filesys_create(file, initial_size);
+	lock_release(&file_lock);
+	return ret;
 }
 bool remove (const char *file){
-	return false;
+	bool ret;
+	lock_acquire(&file_lock);
+	ret=filesys_remove(file);
+	lock_release(&file_lock);
+	return ret;
 }
 int open (const char *file){
 	return -1;
@@ -145,7 +166,15 @@ int read (int fd, void *buffer, unsigned size){
 	return -1;
 }
 int write (int fd, const void *buffer, unsigned size){
-	return -1;
+	int ret=-1;
+	if(fd==1){
+	putbuf(buffer, size);
+	ret=size;
+	}else{
+	
+	
+}
+	return ret;
 }
 void seek (int fd, unsigned position){
 	return ;

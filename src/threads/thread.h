@@ -13,7 +13,12 @@ enum thread_status
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
     THREAD_DYING        /* About to be destroyed. */
   };
-
+struct child{
+	int status;
+	int pid;
+	bool waited;
+	struct list_elem child_elem;
+};
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
@@ -109,11 +114,14 @@ struct thread
     struct lock *wanted_lock;
     /* for project 2 */
     struct semaphore *child_sema;
+    struct semaphore *wait_sema;
     bool success;
     int ret;
+    bool waited;
+    struct child *child;
     struct thread *parent;
     struct list children;
-    struct list_elem child;
+    struct list_elem child_elem;
   };
   
 /* If false (default), use round-robin scheduler.
@@ -148,6 +156,7 @@ void test_yield(void);
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 void check_count(struct thread *, void *);
+struct thread* get_child(tid_t tid);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
